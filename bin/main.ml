@@ -1,0 +1,258 @@
+open Printf
+open Types
+module StrMap = Map.Make (String)
+module StrSet = Set.Make (String)
+
+let union_nuts a b =
+  let merger _ _ y =
+    println "union_nuts detected a collision";
+    Some y
+  in
+  StrMap.union merger a b
+
+let rec free_vars_base_type =
+  let open StrSet in
+  function
+  | Sum (a, b) | Product (a, b) ->
+      union (free_vars_base_type a) (free_vars_base_type b)
+  | Inductive { x; a } -> filter (( <> ) x) (free_vars_base_type a)
+  | Variable x -> singleton x
+  | Unit -> empty
+
+let rec free_vars_expr =
+  let open StrSet in
+  function
+  | Value _ -> empty
+  | Let { omega; e; _ } -> union (free_vars_iso omega) (free_vars_expr e)
+
+and free_vars_iso =
+  let open StrSet in
+  function
+  | Pairs p ->
+      List.map (fun (_, e) -> free_vars_expr e) p |> List.fold_left union empty
+  | Fix { phi; omega } | Lambda { psi = phi; omega } ->
+      filter (( <> ) phi) (free_vars_iso omega)
+  | Variable phi -> singleton phi
+  | App { omega_1; omega_2; _ } ->
+      union (free_vars_iso omega_1) (free_vars_iso omega_2)
+
+let rec subst_base_type ~what ~src ~dst =
+  let subst = fun what -> subst_base_type ~what ~src ~dst in
+  match what with
+  | Sum (a, b) -> Sum (subst a, subst b)
+  | Product (a, b) -> Product (subst a, subst b)
+  | Inductive { x; a } when x <> src ->
+      let invalid = StrSet.exists (( = ) x) (free_vars_base_type dst) in
+      println_if invalid "a variable has been bound incorrectly";
+      Inductive { x; a = subst a }
+  | Variable x when x = src -> dst
+  | Unit | Inductive _ | Variable _ -> what
+
+let rec subst_value ~(what : value) ~src ~(dst : value) =
+  let subst = fun what -> subst_value ~what ~src ~dst in
+  match what with
+  | Variable x when x = src -> dst
+  | InjLeft v | InjRight v | Fold v -> subst v
+  | Pair (v_1, v_2) -> Pair (subst v_1, subst v_2)
+  | Unit | Variable _ -> what
+
+let rec subst_value_in_expr ~what ~src ~dst =
+  match what with
+  | Value v -> Value (subst_value ~what:v ~src ~dst)
+  | Let ({ e; _ } as l) ->
+      Let { l with e = subst_value_in_expr ~what:e ~src ~dst }
+
+let rec subst_term ~what ~src ~dst =
+  let subst = fun what -> subst_term ~what ~src ~dst in
+  match what with
+  | Variable x when x = src -> dst
+  | InjLeft t -> InjLeft (subst t)
+  | InjRight t -> InjRight (subst t)
+  | Pair (t_1, t_2) -> Pair (subst t_1, subst t_2)
+  | Fold t -> Fold (subst t)
+  | App ({ t; _ } as app) -> App { app with t = subst t }
+  | Let ({ t_1; t_2; _ } as l) ->
+      Let { l with t_1 = subst t_1; t_2 = subst t_2 }
+  | Unit | Variable _ -> what
+
+let rec subst_iso_in_expr ~what ~src ~dst =
+  match what with
+  | Value _ -> what
+  | Let ({ omega; e; _ } as l) ->
+      Let
+        {
+          l with
+          omega = subst_iso ~what:omega ~src ~dst;
+          e = subst_iso_in_expr ~what:e ~src ~dst;
+        }
+
+and subst_iso ~what ~src ~dst =
+  let subst = fun what -> subst_iso ~what ~src ~dst in
+  match what with
+  | Pairs p ->
+      let f (v, e) = (v, subst_iso_in_expr ~what:e ~src ~dst) in
+      Pairs (List.map f p)
+  | Fix { phi; omega } when phi <> src ->
+      let invalid = StrSet.exists (( = ) phi) (free_vars_iso omega) in
+      println_if invalid "a variable has been bound incorrectly";
+      Fix { phi; omega = subst omega }
+  | Lambda { psi; omega } when psi <> src ->
+      let invalid = StrSet.exists (( = ) psi) (free_vars_iso omega) in
+      println_if invalid "a variable has been bound incorrectly";
+      Lambda { psi; omega = subst omega }
+  | Variable phi when phi = src -> dst
+  | App { omega_1; omega_2; t_1 } ->
+      App { omega_1 = subst omega_1; omega_2 = subst omega_2; t_1 }
+  | Fix _ | Lambda _ | Variable _ -> what
+
+let rec associate (pattern : pattern) products =
+  match (pattern, products) with
+  | Variable x, a -> Some (StrMap.singleton x a)
+  | Pair (p_1, p_2), Product (a, b) ->
+      let* l = associate p_1 a in
+      let+ r = associate p_2 b in
+      union_nuts l r
+  | _ -> None
+
+type psi = iso_type StrMap.t
+type delta = base_type StrMap.t
+type context = { psi : psi; delta : delta }
+
+let rec build_delta (value : value) a =
+  let open StrMap in
+  match (value, a) with
+  | Variable x, _ -> singleton x a
+  | InjLeft v, Sum (a, _) -> build_delta v a
+  | InjRight v, Sum (_, b) -> build_delta v b
+  | Pair (v_1, v_2), Product (a, b) ->
+      union_nuts (build_delta v_1 a) (build_delta v_2 b)
+  | Fold v, (Inductive { x; a } as dst) ->
+      subst_base_type ~what:a ~src:x ~dst |> build_delta v
+  | _ -> empty
+
+let rec validate_term context term (expected : base_type) =
+  match (term, expected) with
+  | Unit, Unit -> true
+  | Variable x, _ ->
+      Option.map (( = ) expected) (StrMap.find_opt x context.delta)
+      |> value_or_false
+  | InjLeft t, Sum (a, _) -> validate_term context t a
+  | InjRight t, Sum (_, b) -> validate_term context t b
+  | Pair (t_1, t_2), Product (a, b) ->
+      validate_term context t_1 a && validate_term context t_2 b
+  | Fold t, (Inductive { x; a } as dst) ->
+      validate_term context t (subst_base_type ~what:a ~src:x ~dst)
+  | App { omega; t; a }, _ ->
+      validate_iso context.psi omega (Pair (a, expected))
+      && validate_term context t a
+  | Let { p; t_1; t_2; products }, _ ->
+      begin
+        let+ associated = associate p products in
+        let extended =
+          { context with delta = union_nuts context.delta associated }
+        in
+        validate_term context t_1 products
+        && validate_term extended t_2 expected
+      end
+      |> value_or_false
+  | _ -> false
+
+and validate_iso psi iso (expected : iso_type) =
+  match (iso, expected) with
+  | Variable phi, _ ->
+      Option.map (( = ) expected) (StrMap.find_opt phi psi) |> value_or_false
+  | Fix { phi; omega }, _ ->
+      validate_iso (StrMap.add phi expected psi) omega expected
+  | App { omega_2; omega_1; t_1 }, _ ->
+      validate_iso psi omega_1 t_1
+      && validate_iso psi omega_2 (Arrow (t_1, expected))
+  | Lambda { psi = phi; omega }, Arrow (t_1, t_2) ->
+      validate_iso (StrMap.add phi t_1 psi) omega t_2
+  | Pairs p, Pair (a, b) ->
+      let f (v, e) =
+        let delta = build_delta v a in
+        let context = { psi; delta } in
+        validate_term context (term_of_value v) a
+        && validate_term context (term_of_expr e) b
+      in
+      List.map f p |> List.fold_left ( && ) true
+  | _ -> false
+
+let rec unify_value (v_i : value) (v : value) =
+  match (v_i, v) with
+  | Variable x, _ -> Some (StrMap.singleton x v)
+  | Unit, Unit -> Some StrMap.empty
+  | InjLeft v_i, InjLeft v | InjRight v_i, InjRight v | Fold v_i, Fold v ->
+      unify_value v_i v
+  | Pair (v_i_1, v_i_2), Pair (v_1, v_2) ->
+      let* u_1 = unify_value v_i_1 v_1 in
+      let+ u_2 = unify_value v_i_2 v_2 in
+      union_nuts u_1 u_2
+  | _ -> None
+
+let rec unify_pattern (p : pattern) (v : value) =
+  match (p, v) with
+  | Variable x, _ -> Some (StrMap.singleton x v)
+  | Pair (p_1, p_2), Pair (v_1, v_2) ->
+      let* u_1 = unify_pattern p_1 v_1 in
+      let+ u_2 = unify_pattern p_2 v_2 in
+      union_nuts u_1 u_2
+  | _ -> None
+
+let rec sigma p v =
+  match p with
+  | [] -> None
+  | (v_i, e_i) :: tl -> begin
+      match unify_value v_i v with
+      | None -> sigma tl v
+      | Some sigma ->
+          let f src dst what = subst_value_in_expr ~what ~src ~dst in
+          Some (StrMap.fold f sigma e_i)
+    end
+
+let rec eval_iso iso =
+  let rec step = function
+    | Fix { phi; omega } as dst -> Some (subst_iso ~what:omega ~src:phi ~dst)
+    | App { omega_1 = Lambda { psi = phi; omega = omega_1 }; omega_2; _ } ->
+        Some (subst_iso ~what:omega_1 ~src:phi ~dst:omega_2)
+    | App ({ omega_1; _ } as app) ->
+        let+ omega_1' = step omega_1 in
+        (App { app with omega_1 = omega_1' } : iso)
+    | _ -> None
+  in
+  match step iso with Some reduced -> eval_iso reduced | None -> iso
+
+let rec eval_term term =
+  let rec step = function
+    | App { omega = Pairs p; t; _ } ->
+        let* v' = value_of_term t in
+        Option.map term_of_expr (sigma p v')
+    | App ({ omega; _ } as app) ->
+        App { app with omega = eval_iso omega } |> Option.some
+    | Let { p; t_1; t_2; _ } ->
+        let* v = value_of_term t_1 in
+        let+ sigma = unify_pattern p v in
+        let f src dst what = subst_term ~what ~src ~dst:(term_of_value dst) in
+        StrMap.fold f sigma t_2
+    | InjLeft t -> Option.map (fun t -> InjLeft t) (step t)
+    | InjRight t -> Option.map (fun t -> InjRight t) (step t)
+    | Fold t -> Option.map (fun t -> Fold t) (step t)
+    | Pair (t_1, t_2) ->
+        let* t_1 = step t_1 in
+        let+ t_2 = step t_2 in
+        Pair (t_1, t_2)
+    | Unit | Variable _ -> None
+  in
+  match step term with Some reduced -> eval_term reduced | None -> term
+
+let () =
+  let pairs : pairs =
+    [
+      (Pair (Variable "x", Unit), Value (Variable "x"));
+      (Pair (Unit, Variable "x"), Value (Variable "x"));
+    ]
+  in
+  let term =
+    App { omega = Pairs pairs; t = Pair (Variable "y", Unit); a = Unit }
+  in
+  printf "%a\n" pp_term (eval_term term)

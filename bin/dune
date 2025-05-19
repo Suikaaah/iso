@@ -1,0 +1,4 @@
+(executable
+ (public_name iso)
+ (name main)
+ (libraries iso))
