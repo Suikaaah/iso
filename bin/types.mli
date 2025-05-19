@@ -50,8 +50,6 @@ type term =
 val value_or_false : bool option -> bool
 val println : string -> unit
 val println_if : bool -> string -> unit
-val ( let* ) : 'a option -> ('a -> 'b option) -> 'b option
-val ( let+ ) : 'a option -> ('a -> 'b) -> 'b option
 val pp_base_type : out_channel -> base_type -> unit
 val pp_iso_type : out_channel -> iso_type -> unit
 val pp_value : out_channel -> value -> unit
@@ -63,3 +61,8 @@ val term_of_value : value -> term
 val term_of_pattern : pattern -> term
 val term_of_expr : expr -> term
 val value_of_term : term -> value option
+val invert : iso -> iso
+
+(* these definitions break the syntax hightlighting lmao *)
+val ( let* ) : 'a option -> ('a -> 'b option) -> 'b option
+val ( let+ ) : 'a option -> ('a -> 'b) -> 'b option

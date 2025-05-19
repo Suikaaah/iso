@@ -145,3 +145,22 @@ let rec value_of_term : term -> value option =
       let+ v = value_of_term t in
       (Fold v : value)
   | App _ | Let _ -> None
+
+let rec invert =
+  let rec invert_expr e v =
+    match e with Value v' -> (Value v, v') | Let { e; _ } -> invert_expr e v
+  in
+  let invert_pair (v, e) =
+    match e with
+    | Value v' -> (v', Value v)
+    | Let { e; _ } ->
+        let e', v' = invert_expr e v in
+        (v', e')
+  in
+  function
+  | Pairs p -> Pairs (List.map invert_pair p)
+  | Fix { phi; omega } -> Fix { phi; omega = invert omega }
+  | Lambda { psi; omega } -> Lambda { psi; omega = invert omega }
+  | Variable phi -> Variable phi
+  | App { omega_1; omega_2; t_1 } ->
+      App { omega_1 = invert omega_1; omega_2 = invert omega_2; t_1 }
