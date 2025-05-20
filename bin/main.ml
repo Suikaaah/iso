@@ -3,6 +3,10 @@ open Types
 module StrMap = Map.Make (String)
 module StrSet = Set.Make (String)
 
+let value_or_false = Option.value ~default:false
+let println = print_endline
+let println_if p s = if p then println s else ()
+
 let union_nuts a b =
   let merger _ _ y =
     println "union_nuts detected a collision";
@@ -52,7 +56,9 @@ let rec subst_value ~(what : value) ~src ~(dst : value) =
   let subst = fun what -> subst_value ~what ~src ~dst in
   match what with
   | Variable x when x = src -> dst
-  | InjLeft v | InjRight v | Fold v -> subst v
+  | InjLeft v -> InjLeft (subst v)
+  | InjRight v -> InjRight (subst v)
+  | Fold v -> Fold (subst v)
   | Pair (v_1, v_2) -> Pair (subst v_1, subst v_2)
   | Unit | Variable _ -> what
 
@@ -118,6 +124,8 @@ type psi = iso_type StrMap.t
 type delta = base_type StrMap.t
 type context = { psi : psi; delta : delta }
 
+let empty_context = { psi = StrMap.empty; delta = StrMap.empty }
+
 let rec build_delta (value : value) a =
   let open StrMap in
   match (value, a) with
@@ -146,15 +154,13 @@ let rec validate_term context term (expected : base_type) =
       validate_iso context.psi omega (Pair (a, expected))
       && validate_term context t a
   | Let { p; t_1; t_2; products }, _ ->
-      begin
-        let+ associated = associate p products in
-        let extended =
-          { context with delta = union_nuts context.delta associated }
-        in
-        validate_term context t_1 products
-        && validate_term extended t_2 expected
-      end
-      |> value_or_false
+      value_or_false
+      @@
+      let+ associated = associate p products in
+      let extended =
+        { context with delta = union_nuts context.delta associated }
+      in
+      validate_term context t_1 products && validate_term extended t_2 expected
   | _ -> false
 
 and validate_iso psi iso (expected : iso_type) =
@@ -230,29 +236,96 @@ let rec eval_term term =
     | App ({ omega; _ } as app) ->
         App { app with omega = eval_iso omega } |> Option.some
     | Let { p; t_1; t_2; _ } ->
-        let* v = value_of_term t_1 in
+        let* v = Option.bind (step t_1) value_of_term in
         let+ sigma = unify_pattern p v in
         let f src dst what = subst_term ~what ~src ~dst:(term_of_value dst) in
         StrMap.fold f sigma t_2
     | InjLeft t -> Option.map (fun t -> InjLeft t) (step t)
     | InjRight t -> Option.map (fun t -> InjRight t) (step t)
     | Fold t -> Option.map (fun t -> Fold t) (step t)
-    | Pair (t_1, t_2) ->
-        let* t_1 = step t_1 in
-        let+ t_2 = step t_2 in
-        Pair (t_1, t_2)
+    | Pair (t_1, t_2) -> begin
+        match step t_1 with
+        | Some t_1 -> Some (Pair (t_1, t_2))
+        | None ->
+            let+ t_2 = step t_2 in
+            Pair (t_1, t_2)
+      end
     | Unit | Variable _ -> None
   in
+  printf "%a\n\n" pp_term term;
   match step term with Some reduced -> eval_term reduced | None -> term
 
 let () =
-  let pairs : pairs =
-    [
-      (Pair (Variable "x", Unit), Value (Variable "x"));
-      (Pair (Unit, Variable "x"), Value (Variable "x"));
-    ]
+  let nat = Inductive { x = "X"; a = Sum (Unit, Variable "X") } in
+  let succ n : value = Fold (InjRight n) in
+  let zero : value = Fold (InjLeft Unit) in
+  let omega =
+    Fix
+      {
+        phi = "self";
+        omega =
+          Pairs
+            [
+              (zero, Value zero);
+              ( succ (Variable "n"),
+                Let
+                  {
+                    p_1 = Variable "p";
+                    omega = Variable "self";
+                    p_2 = Variable "n";
+                    e = Value (Variable "p");
+                    a = nat;
+                    products = nat;
+                  } );
+            ];
+      }
   in
-  let term =
-    App { omega = Pairs pairs; t = Pair (Variable "y", Unit); a = Unit }
+  let program = App { omega; t = succ (succ zero) |> term_of_value; a = nat } in
+  let well_typed = validate_term empty_context program nat in
+  if well_typed then printf "final: %a\n" pp_term (eval_term program)
+  else println "ill-typed"
+
+(*
+   let () =
+  let nat = Inductive { x = "X"; a = Sum (Unit, Variable "X") } in
+  let nat_list =
+    Inductive { x = "X"; a = Sum (Unit, Product (nat, Variable "X")) }
   in
-  printf "%a\n" pp_term (eval_term term)
+  let succ n : value = Fold (InjRight n) in
+  let zero : value = Fold (InjLeft Unit) in
+  let cons h t : value = Fold (InjRight (Pair (h, t))) in
+  let nil : value = Fold (InjLeft Unit) in
+  let len =
+    Fix
+      {
+        phi = "len";
+        omega =
+          Pairs
+            [
+              (nil, Value (Pair (nil, zero)));
+              ( cons (Variable "h") (Variable "t"),
+                Let
+                  {
+                    p_1 = Pair (Variable "t'", Variable "n");
+                    omega = Variable "len";
+                    p_2 = Variable "t";
+                    e =
+                      Value
+                        (Pair
+                           ( cons (Variable "h") (Variable "t'"),
+                             succ (Variable "n") ));
+                    a = nat_list;
+                    products = Product (nat_list, nat);
+                  } );
+            ];
+      }
+  in
+  let program =
+    App { omega = len; t = cons zero zero |> term_of_value; a = nat_list }
+  in
+  let well_typed =
+    validate_term empty_context program (Product (nat_list, nat))
+  in
+  if well_typed then printf "final: %a\n" pp_term (eval_term program)
+  else println "ill-typed"
+*)

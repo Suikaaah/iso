@@ -47,9 +47,6 @@ type term =
   | App of { omega : iso; t : term; a : base_type }
   | Let of { p : pattern; t_1 : term; t_2 : term; products : base_type }
 
-val value_or_false : bool option -> bool
-val println : string -> unit
-val println_if : bool -> string -> unit
 val pp_base_type : out_channel -> base_type -> unit
 val pp_iso_type : out_channel -> iso_type -> unit
 val pp_value : out_channel -> value -> unit

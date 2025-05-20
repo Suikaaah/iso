@@ -1,8 +1,5 @@
 open Printf
 
-let value_or_false = Option.value ~default:false
-let println = print_endline
-let println_if p s = if p then println s else ()
 let ( let* ) = Option.bind
 let ( let+ ) x f = Option.map f x
 
@@ -75,7 +72,12 @@ let rec pp_expr out = function
         p_2 pp_expr e
 
 and pp_iso out = function
-  | Pairs _ -> fprintf out "<pairs>"
+  | Pairs p ->
+      let pp_pair out (v, e) =
+        fprintf out "\n| %a <-> %a" pp_value v pp_expr e
+      in
+      let pp_pairs out pairs = List.iter (pp_pair out) pairs in
+      fprintf out "{%a\n}" pp_pairs p
   | Fix { phi; omega } -> fprintf out "(fix %s.%a)" phi pp_iso omega
   | Lambda { psi; omega } -> fprintf out "(λ%s.%a)" psi pp_iso omega
   | Variable phi -> fprintf out "%s" phi
@@ -147,16 +149,12 @@ let rec value_of_term : term -> value option =
   | App _ | Let _ -> None
 
 let rec invert =
-  let rec invert_expr e v =
-    match e with Value v' -> (Value v, v') | Let { e; _ } -> invert_expr e v
-  in
-  let invert_pair (v, e) =
+  let rec invert_expr e acc =
     match e with
-    | Value v' -> (v', Value v)
-    | Let { e; _ } ->
-        let e', v' = invert_expr e v in
-        (v', e')
+    | Value v -> (v, acc)
+    | Let ({ e; _ } as l) -> invert_expr e (Let { l with e = acc } : expr)
   in
+  let invert_pair (v, e) = invert_expr e (Value v) in
   function
   | Pairs p -> Pairs (List.map invert_pair p)
   | Fix { phi; omega } -> Fix { phi; omega = invert omega }
