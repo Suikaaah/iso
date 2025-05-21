@@ -3,25 +3,34 @@ open Lexing
 open Parser
 }
 
-let white = [' ' '\t']+
-let newline = '\r' | '\n' | "\r\n"
-let string = [^ '1' '(' ')' '{' '}' '\\' '.' '-' '<' '>' '+' '*' ':' '=' ' ' '\t' '\r' '\n']+
+let white = [' ' '\t' '\r' '\n']+
+let string = [^ '1' '(' ')' '|' '\\' '.' ',' '-' '<' '>' '+' '*' ':' '=' ' ' '\t' '\r' '\n']+
 
 rule token = parse
-    | white { token lexbuf }
-    | "1" { UNIT }
-    | "(" { LPAREN }
-    | ")" { RPAREN }
-    | "{" { LBRACE }
-    | "}" { RBRACE }
-    | "\\" { BACKSLASH }
-    | "." { DOT }
-    | "->" { RIGHTARROW }
-    | "<->" { BIARROW }
-    | "+" { PLUS }
-    | "*" { TIMES }
-    | ":" { COLON }
-    | "=" { EQUAL }
-    | string { ID (lexeme lexbuf) }
-    | newline { EOL }
+  | eof { EOF }
+  | white { token lexbuf }
+  | "1" { UNIT }
+  | "(" { LPAREN }
+  | ")" { RPAREN }
+  | "|" { PIPE }
+  | "\\" { BACKSLASH }
+  | "." { DOT }
+  | "," { COMMA }
+  | "->" { RIGHTARROW }
+  | "<->" { BIARROW }
+  | "+" { PLUS }
+  | "*" { TIMES }
+  | ":" { COLON }
+  | "::" { DOUBLECOLON }
+  | "=" { EQUAL }
+  | "injl" { INJL }
+  | "injr" { INJR }
+  | "fold" { FOLD }
+  | "let" { LET }
+  | "in" { IN }
+  | "iso" { ISO }
+  | "end" { END }
+  | "fix" { FIX }
+  | "type" { TYPE }
+  | string { ID (lexeme lexbuf) }
 

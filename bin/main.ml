@@ -95,6 +95,80 @@ and subst_iso ~what ~src ~dst =
       App { omega_1 = subst omega_1; omega_2 = subst omega_2; t_1 }
   | Fix _ | Lambda _ | Variable _ -> what
 
+let rec subst_base_type_in_value ~(what : value) ~src ~dst =
+  let subst = fun what -> subst_base_type_in_value ~what ~src ~dst in
+  match what with
+  | Unit -> what
+  | Variable _ -> what
+  | InjLeft v -> InjLeft (subst v)
+  | InjRight v -> InjRight (subst v)
+  | Pair (v_1, v_2) -> Pair (subst v_1, subst v_2)
+  | Fold v -> Fold (subst v)
+
+let rec subst_base_type_in_iso_type ~what ~src ~dst =
+  let subst what = subst_base_type_in_iso_type ~what ~src ~dst in
+  match what with
+  | Arrow (t_1, t_2) -> Arrow (subst t_1, subst t_2)
+  | Pair (a, b) ->
+      Pair (subst_base_type ~what:a ~src ~dst, subst_base_type ~what:b ~src ~dst)
+
+let rec subst_base_type_in_expr ~what ~src ~dst =
+  match what with
+  | Value v -> Value (subst_base_type_in_value ~what:v ~src ~dst)
+  | Let ({ omega; e; a; products; _ } as l) ->
+      Let
+        {
+          l with
+          omega = subst_base_type_in_iso ~what:omega ~src ~dst;
+          e = subst_base_type_in_expr ~what:e ~src ~dst;
+          a = subst_base_type ~what:a ~src ~dst;
+          products = subst_base_type ~what:products ~src ~dst;
+        }
+
+and subst_base_type_in_iso ~what ~src ~dst =
+  let subst_in_pair (v, e) =
+    ( subst_base_type_in_value ~what:v ~src ~dst,
+      subst_base_type_in_expr ~what:e ~src ~dst )
+  in
+  let subst = fun what -> subst_base_type_in_iso ~what ~src ~dst in
+  match what with
+  | Variable _ -> what
+  | Pairs p -> Pairs (List.map subst_in_pair p)
+  | Fix { phi; omega } -> Fix { phi; omega = subst omega }
+  | Lambda { psi; omega } -> Lambda { psi; omega = subst omega }
+  | App { omega_1; omega_2; t_1 } ->
+      App
+        {
+          omega_1 = subst omega_1;
+          omega_2 = subst omega_2;
+          t_1 = subst_base_type_in_iso_type ~what:t_1 ~src ~dst;
+        }
+
+let rec subst_base_type_in_term ~what ~src ~dst =
+  let subst = fun what -> subst_base_type_in_term ~what ~src ~dst in
+  match what with
+  | Unit -> Unit
+  | Variable _ -> what
+  | InjLeft t -> InjLeft (subst t)
+  | InjRight t -> InjRight (subst t)
+  | Pair (t_1, t_2) -> Pair (subst t_1, subst t_2)
+  | Fold t -> Fold (subst t)
+  | App { omega; t; a } ->
+      App
+        {
+          omega = subst_base_type_in_iso ~what:omega ~src ~dst;
+          t = subst t;
+          a = subst_base_type ~what:a ~src ~dst;
+        }
+  | Let { p; t_1; t_2; products } ->
+      Let
+        {
+          p;
+          t_1 = subst t_1;
+          t_2 = subst t_2;
+          products = subst_base_type ~what:products ~src ~dst;
+        }
+
 let rec associate (pattern : pattern) products =
   match (pattern, products) with
   | Variable x, a -> Some (StrMap.singleton x a)
@@ -240,10 +314,16 @@ let rec eval_term term =
   match step term with Some reduced -> eval_term reduced | None -> term
 
 let () =
-  let t = Parser.term_eol Lexer.token (Lexing.from_channel stdin) in
-  let a = Parser.base_type_eol Lexer.token (Lexing.from_channel stdin) in
-  printf "input (term):\n%a\n" pp_term t;
-  printf "input (type):\n%a\n" pp_term t;
+  let file = open_in "./source.iso" in
+  let { ts; t; a } = Parser.program Lexer.token (Lexing.from_channel file) in
+  let t =
+    List.fold_left
+      (fun what (src, dst) -> subst_base_type_in_term ~what ~src ~dst)
+      t ts
+  in
+  let a =
+    List.fold_left (fun what (src, dst) -> subst_base_type ~what ~src ~dst) a ts
+  in
   let well_typed = validate_term empty_context t a in
-  if well_typed then printf "output:\n%a\n" pp_term (eval_term t)
+  if well_typed then printf "%a\n" pp_term (eval_term t)
   else println "error: ill-typed"

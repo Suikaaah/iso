@@ -47,6 +47,8 @@ type term =
   | App of { omega : iso; t : term; a : base_type }
   | Let of { p : pattern; t_1 : term; t_2 : term; products : base_type }
 
+type program = { ts : (string * base_type) list; t : term; a : base_type }
+
 val pp_base_type : out_channel -> base_type -> unit
 val pp_iso_type : out_channel -> iso_type -> unit
 val pp_value : out_channel -> value -> unit

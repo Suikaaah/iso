@@ -32,7 +32,7 @@ type value =
   | Fold of value
 
 let rec pp_value out = function
-  | Unit -> fprintf out "1"
+  | Unit -> fprintf out "()"
   | Variable x -> fprintf out "%s" x
   | InjLeft v -> fprintf out "injl %a" pp_value v
   | InjRight v -> fprintf out "injr %a" pp_value v
@@ -94,8 +94,10 @@ type term =
   | App of { omega : iso; t : term; a : base_type }
   | Let of { p : pattern; t_1 : term; t_2 : term; products : base_type }
 
+type program = { ts : (string * base_type) list; t : term; a : base_type }
+
 let rec pp_term out = function
-  | Unit -> fprintf out "1"
+  | Unit -> fprintf out "()"
   | Variable x -> fprintf out "%s" x
   | InjLeft t -> fprintf out "injl %a" pp_term t
   | InjRight t -> fprintf out "injr %a" pp_term t
