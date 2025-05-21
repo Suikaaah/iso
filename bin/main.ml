@@ -197,8 +197,8 @@ let rec sigma p v =
       | None -> sigma tl v
       | Some sigma ->
           let f src dst what = subst_term ~what ~src ~dst in
-          Some
-            (StrMap.fold f (StrMap.map term_of_value sigma) (term_of_expr e_i))
+          StrMap.fold f (StrMap.map term_of_value sigma) (term_of_expr e_i)
+          |> Option.some
     end
 
 let rec eval_iso iso =
@@ -237,41 +237,9 @@ let rec eval_term term =
       end
     | Unit | Variable _ -> None
   in
-  printf "%a\n\n" pp_term term;
   match step term with Some reduced -> eval_term reduced | None -> term
 
 let () =
-  let nat = Inductive { x = "X"; a = Sum (Unit, Variable "X") } in
-  let succ n : value = Fold (InjRight n) in
-  let zero : value = Fold (InjLeft Unit) in
-  let omega =
-    Fix
-      {
-        phi = "self";
-        omega =
-          Pairs
-            [
-              (zero, Value zero);
-              ( succ (Variable "n"),
-                Let
-                  {
-                    p_1 = Variable "p";
-                    omega = Variable "self";
-                    p_2 = Variable "n";
-                    e = Value (Variable "p");
-                    a = nat;
-                    products = nat;
-                  } );
-            ];
-      }
-  in
-  let program = App { omega; t = succ (succ zero) |> term_of_value; a = nat } in
-  let well_typed = validate_term empty_context program nat in
-  if well_typed then printf "final: %a\n" pp_term (eval_term program)
-  else println "ill-typed"
-
-(*
-   let () =
   let nat = Inductive { x = "X"; a = Sum (Unit, Variable "X") } in
   let nat_list =
     Inductive { x = "X"; a = Sum (Unit, Product (nat, Variable "X")) }
@@ -306,11 +274,15 @@ let () =
       }
   in
   let program =
-    App { omega = len; t = cons zero zero |> term_of_value; a = nat_list }
+    App
+      {
+        omega = len;
+        t = cons zero (cons zero zero) |> term_of_value;
+        a = nat_list;
+      }
   in
   let well_typed =
     validate_term empty_context program (Product (nat_list, nat))
   in
-  if well_typed then printf "final: %a\n" pp_term (eval_term program)
+  if well_typed then printf "%a\n" pp_term (eval_term program)
   else println "ill-typed"
-*)
