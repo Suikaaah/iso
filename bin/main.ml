@@ -52,22 +52,6 @@ let rec subst_base_type ~what ~src ~dst =
   | Variable x when x = src -> dst
   | Unit | Inductive _ | Variable _ -> what
 
-let rec subst_value ~(what : value) ~src ~(dst : value) =
-  let subst = fun what -> subst_value ~what ~src ~dst in
-  match what with
-  | Variable x when x = src -> dst
-  | InjLeft v -> InjLeft (subst v)
-  | InjRight v -> InjRight (subst v)
-  | Fold v -> Fold (subst v)
-  | Pair (v_1, v_2) -> Pair (subst v_1, subst v_2)
-  | Unit | Variable _ -> what
-
-let rec subst_value_in_expr ~what ~src ~dst =
-  match what with
-  | Value v -> Value (subst_value ~what:v ~src ~dst)
-  | Let ({ e; _ } as l) ->
-      Let { l with e = subst_value_in_expr ~what:e ~src ~dst }
-
 let rec subst_term ~what ~src ~dst =
   let subst = fun what -> subst_term ~what ~src ~dst in
   match what with
@@ -212,8 +196,9 @@ let rec sigma p v =
       match unify_value v_i v with
       | None -> sigma tl v
       | Some sigma ->
-          let f src dst what = subst_value_in_expr ~what ~src ~dst in
-          Some (StrMap.fold f sigma e_i)
+          let f src dst what = subst_term ~what ~src ~dst in
+          Some
+            (StrMap.fold f (StrMap.map term_of_value sigma) (term_of_expr e_i))
     end
 
 let rec eval_iso iso =
@@ -231,12 +216,12 @@ let rec eval_iso iso =
 let rec eval_term term =
   let rec step = function
     | App { omega = Pairs p; t; _ } ->
-        let* v' = value_of_term t in
-        Option.map term_of_expr (sigma p v')
+        let* v' = value_of_term (eval_term t) in
+        sigma p v'
     | App ({ omega; _ } as app) ->
         App { app with omega = eval_iso omega } |> Option.some
     | Let { p; t_1; t_2; _ } ->
-        let* v = Option.bind (step t_1) value_of_term in
+        let* v = value_of_term (eval_term t_1) in
         let+ sigma = unify_pattern p v in
         let f src dst what = subst_term ~what ~src ~dst:(term_of_value dst) in
         StrMap.fold f sigma t_2
