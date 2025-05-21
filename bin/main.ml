@@ -240,49 +240,10 @@ let rec eval_term term =
   match step term with Some reduced -> eval_term reduced | None -> term
 
 let () =
-  let nat = Inductive { x = "X"; a = Sum (Unit, Variable "X") } in
-  let nat_list =
-    Inductive { x = "X"; a = Sum (Unit, Product (nat, Variable "X")) }
-  in
-  let succ n : value = Fold (InjRight n) in
-  let zero : value = Fold (InjLeft Unit) in
-  let cons h t : value = Fold (InjRight (Pair (h, t))) in
-  let nil : value = Fold (InjLeft Unit) in
-  let len =
-    Fix
-      {
-        phi = "len";
-        omega =
-          Pairs
-            [
-              (nil, Value (Pair (nil, zero)));
-              ( cons (Variable "h") (Variable "t"),
-                Let
-                  {
-                    p_1 = Pair (Variable "t'", Variable "n");
-                    omega = Variable "len";
-                    p_2 = Variable "t";
-                    e =
-                      Value
-                        (Pair
-                           ( cons (Variable "h") (Variable "t'"),
-                             succ (Variable "n") ));
-                    a = nat_list;
-                    products = Product (nat_list, nat);
-                  } );
-            ];
-      }
-  in
-  let program =
-    App
-      {
-        omega = len;
-        t = cons zero (cons zero zero) |> term_of_value;
-        a = nat_list;
-      }
-  in
-  let well_typed =
-    validate_term empty_context program (Product (nat_list, nat))
-  in
-  if well_typed then printf "%a\n" pp_term (eval_term program)
-  else println "ill-typed"
+  let t = Parser.term_eol Lexer.token (Lexing.from_channel stdin) in
+  let a = Parser.base_type_eol Lexer.token (Lexing.from_channel stdin) in
+  printf "input (term):\n%a\n" pp_term t;
+  printf "input (type):\n%a\n" pp_term t;
+  let well_typed = validate_term empty_context t a in
+  if well_typed then printf "output:\n%a\n" pp_term (eval_term t)
+  else println "error: ill-typed"

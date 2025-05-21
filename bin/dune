@@ -1,3 +1,8 @@
+(ocamllex lexer)
+
+(menhir
+  (modules parser))
+
 (executable
  (public_name iso)
  (name main)
