@@ -306,17 +306,16 @@ let rec eval_term term =
   in
   match step term with Some reduced -> eval_term reduced | None -> term
 
-let () =
-  let file = open_in "./source.iso" in
+let read_program path =
+  let file = open_in path in
   let { ts; t; a } = Parser.program Lexer.token (Lexing.from_channel file) in
-  let t =
-    List.fold_left
-      (fun what (src, dst) -> subst_base_type_in_term ~what ~src ~dst)
-      t ts
-  in
-  let a =
-    List.fold_left (fun what (src, dst) -> subst_base_type ~what ~src ~dst) a ts
-  in
+  let ts = List.rev ts in
+  let folder_term what (src, dst) = subst_base_type_in_term ~what ~src ~dst in
+  let folder_base_type what (src, dst) = subst_base_type ~what ~src ~dst in
+  (List.fold_left folder_term t ts, List.fold_left folder_base_type a ts)
+
+let () =
+  let t, a = read_program "./source.iso" in
   let well_typed = validate_term empty_context t a in
   if well_typed then printf "%a\n" pp_term (eval_term t)
   else println "error: ill-typed"
