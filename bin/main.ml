@@ -39,6 +39,7 @@ and free_vars_iso =
   | Variable phi -> singleton phi
   | App { omega_1; omega_2; _ } ->
       union (free_vars_iso omega_1) (free_vars_iso omega_2)
+  | Invert omega -> free_vars_iso omega
 
 let rec subst_base_type ~what ~src ~dst =
   let subst = fun what -> subst_base_type ~what ~src ~dst in
@@ -93,17 +94,8 @@ and subst_iso ~what ~src ~dst =
   | Variable phi when phi = src -> dst
   | App { omega_1; omega_2; t_1 } ->
       App { omega_1 = subst omega_1; omega_2 = subst omega_2; t_1 }
+  | Invert omega -> subst omega
   | Fix _ | Lambda _ | Variable _ -> what
-
-let rec subst_base_type_in_value ~(what : value) ~src ~dst =
-  let subst = fun what -> subst_base_type_in_value ~what ~src ~dst in
-  match what with
-  | Unit -> what
-  | Variable _ -> what
-  | InjLeft v -> InjLeft (subst v)
-  | InjRight v -> InjRight (subst v)
-  | Pair (v_1, v_2) -> Pair (subst v_1, subst v_2)
-  | Fold v -> Fold (subst v)
 
 let rec subst_base_type_in_iso_type ~what ~src ~dst =
   let subst what = subst_base_type_in_iso_type ~what ~src ~dst in
@@ -114,7 +106,7 @@ let rec subst_base_type_in_iso_type ~what ~src ~dst =
 
 let rec subst_base_type_in_expr ~what ~src ~dst =
   match what with
-  | Value v -> Value (subst_base_type_in_value ~what:v ~src ~dst)
+  | Value _ -> what
   | Let ({ omega; e; a; products; _ } as l) ->
       Let
         {
@@ -126,10 +118,7 @@ let rec subst_base_type_in_expr ~what ~src ~dst =
         }
 
 and subst_base_type_in_iso ~what ~src ~dst =
-  let subst_in_pair (v, e) =
-    ( subst_base_type_in_value ~what:v ~src ~dst,
-      subst_base_type_in_expr ~what:e ~src ~dst )
-  in
+  let subst_in_pair (v, e) = (v, subst_base_type_in_expr ~what:e ~src ~dst) in
   let subst = fun what -> subst_base_type_in_iso ~what ~src ~dst in
   match what with
   | Variable _ -> what
@@ -143,6 +132,7 @@ and subst_base_type_in_iso ~what ~src ~dst =
           omega_2 = subst omega_2;
           t_1 = subst_base_type_in_iso_type ~what:t_1 ~src ~dst;
         }
+  | Invert omega -> subst omega
 
 let rec subst_base_type_in_term ~what ~src ~dst =
   let subst = fun what -> subst_base_type_in_term ~what ~src ~dst in
@@ -240,6 +230,8 @@ and validate_iso psi iso (expected : iso_type) =
         && validate_term context (term_of_expr e) b
       in
       List.map f p |> List.fold_left ( && ) true
+  | Invert omega, Pair (a, b) -> validate_iso psi omega (Pair (b, a))
+  | Invert omega, Arrow (t_1, t_2) -> validate_iso psi omega (Arrow (t_2, t_1))
   | _ -> false
 
 let rec unify_value (v_i : value) (v : value) =
@@ -283,6 +275,7 @@ let rec eval_iso iso =
     | App ({ omega_1; _ } as app) ->
         let+ omega_1' = step omega_1 in
         (App { app with omega_1 = omega_1' } : iso)
+    | Invert omega -> Some (invert omega)
     | _ -> None
   in
   match step iso with Some reduced -> eval_iso reduced | None -> iso

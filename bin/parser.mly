@@ -26,6 +26,7 @@ open Types
 %token END
 %token FIX
 %token TYPE
+%token INVERT
 %token <string> ID
 
 %right RIGHTARROW
@@ -97,6 +98,7 @@ iso:
   | x = ID; { Variable x }
   | omega_1 = iso; LPAREN; omega_2 = iso; COLON; t_1 = iso_type; RPAREN;
     { App { omega_1; omega_2; t_1 } }
+  | INVERT; omega = iso; { Invert omega }
 
 term:
   | LPAREN; t = term; RPAREN; { t }

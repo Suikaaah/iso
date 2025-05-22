@@ -32,5 +32,6 @@ rule token = parse
   | "end" { END }
   | "fix" { FIX }
   | "type" { TYPE }
+  | "invert" { INVERT }
   | string { ID (lexeme lexbuf) }
 

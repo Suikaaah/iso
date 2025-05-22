@@ -36,6 +36,7 @@ and iso =
   | Lambda of { psi : string; omega : iso }
   | Variable of string
   | App of { omega_1 : iso; omega_2 : iso; t_1 : iso_type }
+  | Invert of iso
 
 type term =
   | Unit

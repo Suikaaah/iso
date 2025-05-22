@@ -64,6 +64,7 @@ and iso =
   | Lambda of { psi : string; omega : iso }
   | Variable of string
   | App of { omega_1 : iso; omega_2 : iso; t_1 : iso_type }
+  | Invert of iso
 
 let rec pp_expr out = function
   | Value v -> fprintf out "%a" pp_value v
@@ -83,6 +84,7 @@ and pp_iso out = function
   | Variable phi -> fprintf out "%s" phi
   | App { omega_1; omega_2; _ } ->
       fprintf out "(%a %a)" pp_iso omega_1 pp_iso omega_2
+  | Invert omega -> fprintf out "(invert %a)" pp_iso omega
 
 type term =
   | Unit
@@ -164,3 +166,4 @@ let rec invert =
   | Variable phi -> Variable phi
   | App { omega_1; omega_2; t_1 } ->
       App { omega_1 = invert omega_1; omega_2 = invert omega_2; t_1 }
+  | Invert omega -> invert omega
