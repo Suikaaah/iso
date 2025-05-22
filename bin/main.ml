@@ -132,7 +132,7 @@ and subst_base_type_in_iso ~what ~src ~dst =
           omega_2 = subst omega_2;
           t_1 = subst_base_type_in_iso_type ~what:t_1 ~src ~dst;
         }
-  | Invert omega -> subst omega
+  | Invert omega -> Invert (subst omega)
 
 let rec subst_base_type_in_term ~what ~src ~dst =
   let subst = fun what -> subst_base_type_in_term ~what ~src ~dst in

@@ -1,13 +1,13 @@
-type nat = \x. 1 + x
+type nat      = \x. 1 + x
 type nat_list = \x. 1 + (\x. 1 + x) * x
 
-::
-
-(invert
-  iso
-  | () <-> fold injl ()
-  end
-) (() : 1)
-
-:: nat
-
+program : nat_list * nat =
+  (
+    fix len.
+    iso
+      | fold injl ()     <-> (fold injl (), fold injl ())
+      | fold injr (h, t) <->
+          let (t', n) : nat_list * nat = len (t : nat_list) in
+          (fold injr (h, t'), fold injr n)
+    end
+  ) (fold injr (fold injr ((), fold injl ())) : nat_list)

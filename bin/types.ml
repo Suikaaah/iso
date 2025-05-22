@@ -78,7 +78,7 @@ and pp_iso out = function
         fprintf out "\n| %a <-> %a" pp_value v pp_expr e
       in
       let pp_pairs out pairs = List.iter (pp_pair out) pairs in
-      fprintf out "{%a\n}" pp_pairs p
+      fprintf out "iso%a\nend" pp_pairs p
   | Fix { phi; omega } -> fprintf out "(fix %s.%a)" phi pp_iso omega
   | Lambda { psi; omega } -> fprintf out "(λ%s.%a)" psi pp_iso omega
   | Variable phi -> fprintf out "%s" phi

@@ -27,6 +27,7 @@ open Types
 %token FIX
 %token TYPE
 %token INVERT
+%token PROGRAM
 %token <string> ID
 
 %right RIGHTARROW
@@ -47,11 +48,11 @@ open Types
 %%
 
 program:
-  | ts = ts; t = term; DOUBLECOLON; a = base_type; EOF; { { ts; t; a } }
+  | ts = ts; COLON; a = base_type; EQUAL; t = term; EOF; { { ts; t; a } }
 
 ts:
   | TYPE; x = ID; EQUAL; a = base_type; rest = ts; { (x, a) :: rest }
-  | DOUBLECOLON; { [] }
+  | PROGRAM; { [] }
 
 base_type:
   | LPAREN; a = base_type; RPAREN; { a }
