@@ -9,7 +9,7 @@ let println_if p s = if p then println s else ()
 
 let union_nuts a b =
   let merger _ _ y =
-    println "union_nuts detected a collision";
+    println "warning: union_nuts detected a collision";
     Some y
   in
   StrMap.union merger a b
@@ -48,7 +48,7 @@ let rec subst_base_type ~what ~src ~dst =
   | Product (a, b) -> Product (subst a, subst b)
   | Inductive { x; a } when x <> src ->
       let invalid = StrSet.exists (( = ) x) (free_vars_base_type dst) in
-      println_if invalid "a variable has been bound incorrectly";
+      println_if invalid "warning: a variable has been bound incorrectly";
       Inductive { x; a = subst a }
   | Variable x when x = src -> dst
   | Unit | Inductive _ | Variable _ -> what
@@ -79,30 +79,31 @@ let rec subst_iso_in_expr ~what ~src ~dst =
 
 and subst_iso ~what ~src ~dst =
   let subst = fun what -> subst_iso ~what ~src ~dst in
+  let warn invalid =
+    println_if invalid "warning: a variable has been bound incorrectly"
+  in
   match what with
   | Pairs p ->
       let f (v, e) = (v, subst_iso_in_expr ~what:e ~src ~dst) in
       Pairs (List.map f p)
   | Fix { phi; omega } when phi <> src ->
-      let invalid = StrSet.exists (( = ) phi) (free_vars_iso omega) in
-      println_if invalid "a variable has been bound incorrectly";
+      StrSet.exists (( = ) phi) (free_vars_iso omega) |> warn;
       Fix { phi; omega = subst omega }
   | Lambda { psi; omega } when psi <> src ->
-      let invalid = StrSet.exists (( = ) psi) (free_vars_iso omega) in
-      println_if invalid "a variable has been bound incorrectly";
+      StrSet.exists (( = ) psi) (free_vars_iso omega) |> warn;
       Lambda { psi; omega = subst omega }
   | Variable phi when phi = src -> dst
   | App { omega_1; omega_2; t_1 } ->
       App { omega_1 = subst omega_1; omega_2 = subst omega_2; t_1 }
-  | Invert omega -> subst omega
+  | Invert omega -> Invert (subst omega)
   | Fix _ | Lambda _ | Variable _ -> what
 
 let rec subst_base_type_in_iso_type ~what ~src ~dst =
-  let subst what = subst_base_type_in_iso_type ~what ~src ~dst in
+  let subst_i what = subst_base_type_in_iso_type ~what ~src ~dst in
+  let subst_b what = subst_base_type ~what ~src ~dst in
   match what with
-  | Arrow (t_1, t_2) -> Arrow (subst t_1, subst t_2)
-  | Pair (a, b) ->
-      Pair (subst_base_type ~what:a ~src ~dst, subst_base_type ~what:b ~src ~dst)
+  | Arrow (t_1, t_2) -> Arrow (subst_i t_1, subst_i t_2)
+  | Pair (a, b) -> Pair (subst_b a, subst_b b)
 
 let rec subst_base_type_in_expr ~what ~src ~dst =
   match what with
@@ -137,8 +138,7 @@ and subst_base_type_in_iso ~what ~src ~dst =
 let rec subst_base_type_in_term ~what ~src ~dst =
   let subst = fun what -> subst_base_type_in_term ~what ~src ~dst in
   match what with
-  | Unit -> Unit
-  | Variable _ -> what
+  | Unit | Variable _ -> what
   | InjLeft t -> InjLeft (subst t)
   | InjRight t -> InjRight (subst t)
   | Pair (t_1, t_2) -> Pair (subst t_1, subst t_2)
@@ -157,6 +157,44 @@ let rec subst_base_type_in_term ~what ~src ~dst =
           t_1 = subst t_1;
           t_2 = subst t_2;
           products = subst_base_type ~what:products ~src ~dst;
+        }
+
+let rec subst_value ~(what : value) ~src ~(dst : value) =
+  let subst what = subst_value ~what ~src ~dst in
+  match what with
+  | Variable x when x = src -> dst
+  | InjLeft v -> InjLeft (subst v)
+  | InjRight v -> InjRight (subst v)
+  | Pair (v_1, v_2) -> Pair (subst v_1, subst v_2)
+  | Fold v -> Fold (subst v)
+  | Unit | Variable _ -> what
+
+let rec subst_value_in_iso ~what ~src ~dst =
+  let subst what = subst_value_in_iso ~what ~src ~dst in
+  match what with
+  | Pairs p ->
+      Pairs
+        (List.map
+           (fun (v, e) ->
+             ( subst_value ~what:v ~src ~dst,
+               subst_value_in_expr ~what:e ~src ~dst ))
+           p)
+  | Fix { phi; omega } -> Fix { phi; omega = subst omega }
+  | Lambda { psi; omega } -> Lambda { psi; omega = subst omega }
+  | Variable _ -> what
+  | App { omega_1; omega_2; t_1 } ->
+      App { omega_1 = subst omega_1; omega_2 = subst omega_2; t_1 }
+  | Invert omega -> Invert (subst omega)
+
+and subst_value_in_expr ~what ~src ~dst =
+  match what with
+  | Value v -> Value (subst_value ~what:v ~src ~dst)
+  | Let ({ omega; e; _ } as l) ->
+      Let
+        {
+          l with
+          omega = subst_value_in_iso ~what:omega ~src ~dst;
+          e = subst_value_in_expr ~what:e ~src ~dst;
         }
 
 let rec associate (pattern : pattern) products =
@@ -255,16 +293,15 @@ let rec unify_pattern (p : pattern) (v : value) =
       union_nuts u_1 u_2
   | _ -> None
 
-let rec sigma p v =
-  match p with
+let rec sigma (pairs : (value * expr) list) (value : value) =
+  match pairs with
   | [] -> None
   | (v_i, e_i) :: tl -> begin
-      match unify_value v_i v with
-      | None -> sigma tl v
+      match unify_value v_i value with
+      | None -> sigma tl value
       | Some sigma ->
-          let f src dst what = subst_term ~what ~src ~dst in
-          StrMap.fold f (StrMap.map term_of_value sigma) (term_of_expr e_i)
-          |> Option.some
+          let f src dst what = subst_value_in_expr ~what ~src ~dst in
+          Some (StrMap.fold f sigma e_i)
     end
 
 let rec eval_iso iso =
@@ -284,7 +321,7 @@ let rec eval_term term =
   let rec step = function
     | App { omega = Pairs p; t; _ } ->
         let* v' = value_of_term (eval_term t) in
-        sigma p v'
+        Option.map term_of_expr (sigma p v')
     | App ({ omega; _ } as app) ->
         App { app with omega = eval_iso omega } |> Option.some
     | Let { p; t_1; t_2; _ } ->
