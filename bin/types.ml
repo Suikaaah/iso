@@ -170,3 +170,40 @@ let rec invert =
   | App { omega_1; omega_2; t_1 } ->
       App { omega_1 = invert omega_1; omega_2 = invert omega_2; t_1 }
   | Invert omega -> invert omega
+
+let rec are_orthogonal t_1 t_2 =
+  match t_1 with
+  | Unit | Variable _ | App _ -> false
+  | InjLeft t_1 -> begin
+      match t_2 with
+      | Unit | Variable _ | App _ -> false
+      | InjLeft t_2 | Fold t_2 | Let { t_2; _ } -> are_orthogonal t_1 t_2
+      | InjRight _ -> true
+      | Pair (t_2_1, t_2_2) ->
+          are_orthogonal t_1 t_2_1 || are_orthogonal t_1 t_2_2
+    end
+  | InjRight t_1 -> begin
+      match t_2 with
+      | Unit | Variable _ | App _ -> false
+      | InjLeft _ -> true
+      | InjRight t_2 | Fold t_2 | Let { t_2; _ } -> are_orthogonal t_1 t_2
+      | Pair (t_2_1, t_2_2) ->
+          are_orthogonal t_1 t_2_1 || are_orthogonal t_1 t_2_2
+    end
+  | Pair (t_1_1, t_1_2) -> begin
+      match t_2 with
+      | Unit | Variable _ | App _ -> false
+      | InjLeft t_2 | InjRight t_2 | Fold t_2 | Let { t_2; _ } ->
+          are_orthogonal t_1_1 t_2 || are_orthogonal t_1_2 t_2
+      | Pair (t_2_1, t_2_2) ->
+          are_orthogonal t_1_1 t_2_1 || are_orthogonal t_1_1 t_2_2
+          || are_orthogonal t_1_2 t_2_1 || are_orthogonal t_1_2 t_2_2
+    end
+  | Fold t_1 | Let { t_2 = t_1; _ } -> begin
+      match t_2 with
+      | Unit | Variable _ | App _ -> false
+      | InjLeft t_2 | InjRight t_2 | Fold t_2 | Let { t_2; _ } ->
+          are_orthogonal t_1 t_2
+      | Pair (t_2_1, t_2_2) ->
+          are_orthogonal t_1 t_2_1 || are_orthogonal t_1 t_2_2
+    end

@@ -61,10 +61,12 @@ base_type:
   | a = base_type; TIMES; b = base_type; { Product (a, b) }
   | BACKSLASH; x = ID; DOT; a = base_type; { Inductive { x; a } }
   | x = ID; { Variable x }
+  | LPAREN; a = base_type; RPAREN; { a }
 
 iso_type:
   | a = base_type; BIARROW; b = base_type; { Pair (a, b) }
   | t_1 = iso_type; RIGHTARROW; t_2 = iso_type; { Arrow (t_1, t_2) }
+  | LPAREN; t = iso_type; RPAREN; { t }
 
 value:
   | LPAREN; RPAREN; { Unit }

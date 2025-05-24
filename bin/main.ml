@@ -33,7 +33,7 @@ and free_vars_iso =
   let open StrSet in
   function
   | Pairs p ->
-      List.map (fun (_, e) -> free_vars_expr e) p |> List.fold_left union empty
+      List.fold_left (fun acc (_, e) -> union acc (free_vars_expr e)) empty p
   | Fix { phi; omega } | Lambda { psi = phi; omega } ->
       filter (( <> ) phi) (free_vars_iso omega)
   | Variable phi -> singleton phi
@@ -223,13 +223,23 @@ and validate_iso psi iso (expected : iso_type) =
   | Lambda { psi = phi; omega }, Arrow (t_1, t_2) ->
       validate_iso (StrMap.add phi t_1 psi) omega t_2
   | Pairs p, Pair (a, b) ->
-      let f (v, e) =
-        let delta = build_delta v a in
-        let context = { psi; delta } in
+      let validate_pair (v, e) =
+        let context = { psi; delta = build_delta v a } in
         validate_term context (term_of_value v) a
         && validate_term context (term_of_expr e) b
       in
-      List.map f p |> List.fold_left ( && ) true
+      let rec validate_ortho = function
+        | [] -> true
+        | (v, e) :: tl ->
+            validate_ortho tl
+            && List.fold_left
+                 (fun acc (v', e') ->
+                   acc
+                   && are_orthogonal (term_of_value v) (term_of_value v')
+                   && are_orthogonal (term_of_expr e) (term_of_expr e'))
+                 true tl
+      in
+      List.for_all validate_pair p && validate_ortho p
   | Invert omega, Pair (a, b) -> validate_iso psi omega (Pair (b, a))
   | Invert omega, Arrow (t_1, t_2) -> validate_iso psi omega (Arrow (t_2, t_1))
   | _ -> false
@@ -314,6 +324,20 @@ let read_program path =
   (List.fold_left folder_term t ts, List.fold_left folder_base_type a ts)
 
 let () =
+  let fl t = Fold (InjLeft t) in
+  let fr t = Fold (InjRight t) in
+  let left = Pair (fl Unit, fl Unit) in
+  let right =
+    Let
+      {
+        p = Variable "";
+        t_1 = Unit;
+        t_2 = Pair (fr (Pair (Variable "h", Variable "t'")), fr (Variable "n"));
+        products = Unit;
+      }
+  in
+  let o = are_orthogonal left right in
+  println_if o "o";
   let t, a = read_program "./source.iso" in
   (* printf "input:\n%a\n\n" pp_term t; *)
   let well_typed = validate_term empty_context t a in
