@@ -15,7 +15,6 @@ open Types
 %token PLUS
 %token TIMES
 %token COLON
-%token DOUBLECOLON
 %token EQUAL
 %token INJL
 %token INJR
@@ -28,6 +27,8 @@ open Types
 %token TYPE
 %token INVERT
 %token PROGRAM
+%token FOLDINJL
+%token FOLDINJR
 %token <string> ID
 
 %right RIGHTARROW
@@ -55,7 +56,6 @@ ts:
   | PROGRAM; { [] }
 
 base_type:
-  | LPAREN; a = base_type; RPAREN; { a }
   | UNIT; { Unit }
   | a = base_type; PLUS; b = base_type; { Sum (a, b) }
   | a = base_type; TIMES; b = base_type; { Product (a, b) }
@@ -63,25 +63,24 @@ base_type:
   | x = ID; { Variable x }
 
 iso_type:
-  | LPAREN; t = iso_type; RPAREN; { t }
   | a = base_type; BIARROW; b = base_type; { Pair (a, b) }
   | t_1 = iso_type; RIGHTARROW; t_2 = iso_type; { Arrow (t_1, t_2) }
 
 value:
-  | LPAREN; v = value; RPAREN; { v }
   | LPAREN; RPAREN; { Unit }
   | x = ID; { Variable x }
   | INJL; v = value; { InjLeft v }
   | INJR; v = value; { InjRight v }
   | LPAREN; v_1 = value; COMMA; v_2 = value; RPAREN; { Pair (v_1, v_2) }
   | FOLD; v = value; { Fold v }
+  | FOLDINJL; v = value; { Fold (InjLeft v) }
+  | FOLDINJR; v = value; { Fold (InjRight v) }
 
 pattern:
   | x = ID; { Variable x }
   | LPAREN; p_1 = pattern; COMMA; p_2 = pattern; RPAREN; { Pair (p_1, p_2) }
 
 expr:
-  | LPAREN; e = expr; RPAREN; { e }
   | LET; p_1 = pattern; COLON; products = base_type; EQUAL;
     omega = iso; LPAREN; p_2 = pattern; COLON; a = base_type; RPAREN;
     IN; e = expr; { Let { p_1; omega; p_2; e; a; products } }
@@ -92,7 +91,6 @@ pairs:
   | END; { [] }
 
 iso:
-  | LPAREN; omega = iso; RPAREN; { omega }
   | ISO; p = pairs; { Pairs p }
   | FIX; phi = ID; DOT; omega = iso; { Fix { phi; omega } }
   | BACKSLASH; psi = ID; DOT; omega = iso; { Lambda { psi; omega } }
@@ -100,9 +98,9 @@ iso:
   | omega_1 = iso; LPAREN; omega_2 = iso; COLON; t_1 = iso_type; RPAREN;
     { App { omega_1; omega_2; t_1 } }
   | INVERT; omega = iso; { Invert omega }
+  | LPAREN; omega = iso; RPAREN; { omega }
 
 term:
-  | LPAREN; t = term; RPAREN; { t }
   | LPAREN; RPAREN; { Unit }
   | x = ID; { Variable x }
   | INJL; t = term; { InjLeft t }
@@ -113,4 +111,6 @@ term:
     { Let { p; t_1; t_2; products } }
   | omega = iso; LPAREN; t = term; COLON; a = base_type; RPAREN;
     { App { omega; t; a } }
+  | FOLDINJL; t = term; { Fold (InjLeft t) }
+  | FOLDINJR; t = term; { Fold (InjRight t) }
 

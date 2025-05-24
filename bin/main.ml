@@ -159,44 +159,6 @@ let rec subst_base_type_in_term ~what ~src ~dst =
           products = subst_base_type ~what:products ~src ~dst;
         }
 
-let rec subst_value ~(what : value) ~src ~(dst : value) =
-  let subst what = subst_value ~what ~src ~dst in
-  match what with
-  | Variable x when x = src -> dst
-  | InjLeft v -> InjLeft (subst v)
-  | InjRight v -> InjRight (subst v)
-  | Pair (v_1, v_2) -> Pair (subst v_1, subst v_2)
-  | Fold v -> Fold (subst v)
-  | Unit | Variable _ -> what
-
-let rec subst_value_in_iso ~what ~src ~dst =
-  let subst what = subst_value_in_iso ~what ~src ~dst in
-  match what with
-  | Pairs p ->
-      Pairs
-        (List.map
-           (fun (v, e) ->
-             ( subst_value ~what:v ~src ~dst,
-               subst_value_in_expr ~what:e ~src ~dst ))
-           p)
-  | Fix { phi; omega } -> Fix { phi; omega = subst omega }
-  | Lambda { psi; omega } -> Lambda { psi; omega = subst omega }
-  | Variable _ -> what
-  | App { omega_1; omega_2; t_1 } ->
-      App { omega_1 = subst omega_1; omega_2 = subst omega_2; t_1 }
-  | Invert omega -> Invert (subst omega)
-
-and subst_value_in_expr ~what ~src ~dst =
-  match what with
-  | Value v -> Value (subst_value ~what:v ~src ~dst)
-  | Let ({ omega; e; _ } as l) ->
-      Let
-        {
-          l with
-          omega = subst_value_in_iso ~what:omega ~src ~dst;
-          e = subst_value_in_expr ~what:e ~src ~dst;
-        }
-
 let rec associate (pattern : pattern) products =
   match (pattern, products) with
   | Variable x, a -> Some (StrMap.singleton x a)
@@ -300,8 +262,8 @@ let rec sigma (pairs : (value * expr) list) (value : value) =
       match unify_value v_i value with
       | None -> sigma tl value
       | Some sigma ->
-          let f src dst what = subst_value_in_expr ~what ~src ~dst in
-          Some (StrMap.fold f sigma e_i)
+          let f src dst what = subst_term ~what ~src ~dst:(term_of_value dst) in
+          StrMap.fold f sigma (term_of_expr e_i) |> Option.some
     end
 
 let rec eval_iso iso =
@@ -321,7 +283,7 @@ let rec eval_term term =
   let rec step = function
     | App { omega = Pairs p; t; _ } ->
         let* v' = value_of_term (eval_term t) in
-        Option.map term_of_expr (sigma p v')
+        sigma p v'
     | App ({ omega; _ } as app) ->
         App { app with omega = eval_iso omega } |> Option.some
     | Let { p; t_1; t_2; _ } ->
@@ -353,6 +315,7 @@ let read_program path =
 
 let () =
   let t, a = read_program "./source.iso" in
+  (* printf "input:\n%a\n\n" pp_term t; *)
   let well_typed = validate_term empty_context t a in
-  if well_typed then printf "%a\n" pp_term (eval_term t)
+  if well_typed then printf "output:\n%a\n" pp_term (eval_term t)
   else println "error: ill-typed"

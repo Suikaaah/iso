@@ -14,7 +14,7 @@ let rec pp_base_type out = function
   | Unit -> fprintf out "1"
   | Sum (a, b) -> fprintf out "(%a + %a)" pp_base_type a pp_base_type b
   | Product (a, b) -> fprintf out "(%a * %a)" pp_base_type a pp_base_type b
-  | Inductive { x; a } -> fprintf out "(μ%s.%a)" x pp_base_type a
+  | Inductive { x; a } -> fprintf out "(μ%s. %a)" x pp_base_type a
   | Variable x -> fprintf out "%s" x
 
 type iso_type = Pair of base_type * base_type | Arrow of iso_type * iso_type
@@ -69,7 +69,7 @@ and iso =
 let rec pp_expr out = function
   | Value v -> fprintf out "%a" pp_value v
   | Let { p_1; omega; p_2; e; _ } ->
-      fprintf out "let %a = %a %a in %a" pp_pattern p_1 pp_iso omega pp_pattern
+      fprintf out "let %a = %a %a in\n%a" pp_pattern p_1 pp_iso omega pp_pattern
         p_2 pp_expr e
 
 and pp_iso out = function
@@ -79,8 +79,8 @@ and pp_iso out = function
       in
       let pp_pairs out pairs = List.iter (pp_pair out) pairs in
       fprintf out "iso%a\nend" pp_pairs p
-  | Fix { phi; omega } -> fprintf out "(fix %s.%a)" phi pp_iso omega
-  | Lambda { psi; omega } -> fprintf out "(λ%s.%a)" psi pp_iso omega
+  | Fix { phi; omega } -> fprintf out "(fix %s. %a)" phi pp_iso omega
+  | Lambda { psi; omega } -> fprintf out "(λ%s. %a)" psi pp_iso omega
   | Variable phi -> fprintf out "%s" phi
   | App { omega_1; omega_2; _ } ->
       fprintf out "(%a %a)" pp_iso omega_1 pp_iso omega_2
@@ -107,7 +107,7 @@ let rec pp_term out = function
   | Fold t -> fprintf out "fold %a" pp_term t
   | App { omega; t; _ } -> fprintf out "(%a %a)" pp_iso omega pp_term t
   | Let { p; t_1; t_2; _ } ->
-      fprintf out "let %a = %a in %a" pp_pattern p pp_term t_1 pp_term t_2
+      fprintf out "let %a = %a in\n%a" pp_pattern p pp_term t_1 pp_term t_2
 
 let rec term_of_value : value -> term = function
   | Unit -> Unit
@@ -156,7 +156,10 @@ let rec invert =
   let rec invert_expr e acc =
     match e with
     | Value v -> (v, acc)
-    | Let ({ e; _ } as l) -> invert_expr e (Let { l with e = acc } : expr)
+    | Let ({ p_1; omega; p_2; e; _ } as l) ->
+        invert_expr e
+          (Let { l with p_1 = p_2; omega = invert omega; p_2 = p_1; e = acc }
+            : expr)
   in
   let invert_pair (v, e) = invert_expr e (Value v) in
   function

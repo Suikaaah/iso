@@ -21,7 +21,6 @@ rule token = parse
   | "+" { PLUS }
   | "*" { TIMES }
   | ":" { COLON }
-  | "::" { DOUBLECOLON }
   | "=" { EQUAL }
   | "injl" { INJL }
   | "injr" { INJR }
@@ -34,5 +33,7 @@ rule token = parse
   | "type" { TYPE }
   | "invert" { INVERT }
   | "program" { PROGRAM }
+  | "fl" { FOLDINJL }
+  | "fr" { FOLDINJR }
   | string { ID (lexeme lexbuf) }
 
