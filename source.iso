@@ -1,5 +1,5 @@
-type nat      = \x. 1 + x
-type nat_list = \x. 1 + nat * x
+type nat      = mu x. 1 + x
+type nat_list = mu x. 1 + nat * x
 
 program : nat_list * nat =
   let 0   : nat      = fl ()                       in

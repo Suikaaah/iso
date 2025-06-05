@@ -29,6 +29,7 @@ open Types
 %token PROGRAM
 %token FOLDINJL
 %token FOLDINJR
+%token MU
 %token <string> ID
 
 %right RIGHTARROW
@@ -59,7 +60,7 @@ base_type:
   | UNIT; { Unit }
   | a = base_type; PLUS; b = base_type; { Sum (a, b) }
   | a = base_type; TIMES; b = base_type; { Product (a, b) }
-  | BACKSLASH; x = ID; DOT; a = base_type; { Inductive { x; a } }
+  | MU; x = ID; DOT; a = base_type; { Inductive { x; a } }
   | x = ID; { Variable x }
   | LPAREN; a = base_type; RPAREN; { a }
 

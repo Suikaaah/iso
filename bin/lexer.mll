@@ -35,5 +35,6 @@ rule token = parse
   | "program" { PROGRAM }
   | "fl" { FOLDINJL }
   | "fr" { FOLDINJR }
+  | "mu" { MU }
   | string { ID (lexeme lexbuf) }
 
