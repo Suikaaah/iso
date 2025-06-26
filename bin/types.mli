@@ -63,6 +63,7 @@ val term_of_expr : expr -> term
 val value_of_term : term -> value option
 val invert : iso -> iso
 val are_orthogonal : term -> term -> bool
+val extract_value : expr -> value
 
 (* these definitions break the syntax hightlighting lmao *)
 val ( let* ) : 'a option -> ('a -> 'b option) -> 'b option

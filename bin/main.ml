@@ -232,15 +232,25 @@ and validate_iso psi iso (expected : iso_type) =
         | [] -> true
         | (v, e) :: tl ->
             validate_ortho tl
+            && List.for_all
+                 (fun (v', e') ->
+                   are_orthogonal (term_of_value v) (term_of_value v')
+                   && are_orthogonal
+                        (extract_value e |> term_of_value)
+                        (extract_value e' |> term_of_value))
+                 tl
+        (*
+            this is what I replaced with the term above
+
             && List.fold_left
                  (fun acc (v', e') ->
                    acc
                    && are_orthogonal (term_of_value v) (term_of_value v')
                    && are_orthogonal (term_of_expr e) (term_of_expr e'))
                  true tl
+                 *)
       in
-      (* bruh *)
-      List.for_all validate_pair p && (true || validate_ortho p)
+      List.for_all validate_pair p && validate_ortho p
   | Invert omega, Pair (a, b) -> validate_iso psi omega (Pair (b, a))
   | Invert omega, Arrow (t_1, t_2) -> validate_iso psi omega (Arrow (t_2, t_1))
   | _ -> false

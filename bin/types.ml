@@ -207,3 +207,7 @@ let rec are_orthogonal t_1 t_2 =
       | Pair (t_2_1, t_2_2) ->
           are_orthogonal t_1 t_2_1 || are_orthogonal t_1 t_2_2
     end
+
+let rec extract_value = function
+  | Value v -> v
+  | Let { e; _ } -> extract_value e
