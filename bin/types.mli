@@ -1,3 +1,5 @@
+open Util
+
 type base_type =
   | Unit
   | Sum of base_type * base_type
@@ -64,6 +66,25 @@ val value_of_term : term -> value option
 val invert : iso -> iso
 val are_orthogonal : term -> term -> bool
 val extract_value : expr -> value
+val free_vars_base_type : base_type -> StrSet.t
+val free_vars_expr : expr -> StrSet.t
+val free_vars_iso : iso -> StrSet.t
+val subst_base_type : what:base_type -> src:string -> dst:base_type -> base_type
+val subst_term : what:term -> src:string -> dst:term -> term
+val subst_iso_in_expr : what:expr -> src:string -> dst:iso -> expr
+val subst_iso : what:iso -> src:string -> dst:iso -> iso
+
+val subst_base_type_in_iso_type :
+  what:iso_type -> src:string -> dst:base_type -> iso_type
+
+val subst_base_type_in_expr : what:expr -> src:string -> dst:base_type -> expr
+val subst_base_type_in_iso : what:iso -> src:string -> dst:base_type -> iso
+val subst_base_type_in_term : what:term -> src:string -> dst:base_type -> term
+val unify_value : value -> value -> value StrMap.t option
+val unify_pattern : pattern -> value -> value StrMap.t option
+val associate : pattern -> base_type -> base_type StrMap.t option
+val build_delta : value -> base_type -> base_type StrMap.t
+val sigma : (value * expr) list -> value -> term option
 
 (* these definitions break the syntax hightlighting lmao *)
 val ( let* ) : 'a option -> ('a -> 'b option) -> 'b option
