@@ -1,52 +1,63 @@
 #import "@preview/curryst:0.5.1": prooftree, rule
-#set text(size: 13pt, font: "New Computer Modern")
+#set text(size: 12pt, font: "New Computer Modern")
 #show raw: set text(font: "CaskaydiaMono NF")
 #show math.phi: math.phi.alt
 #let abox(a, body) = align(a, box(body))
 #let btree(body) = box(prooftree(body))
 #let tack_sub(sub) = $thick #box($tack$) _sub thick$
-#let unit = $bb(1)$
+#let unit = `unit`
+#let bool = `bool`
+#let i64 = `i64`
 #let tsum = $plus.circle$
 #let tprod = $times.circle$
+#let rules(body) = align(center)[
+  #set par(leading: 1em)
+  #show math.equation: set par(leading: 0.25em)
+  #body
+]
 
 *Grammar*
 
-#abox(left)[
-  $
-    & "(Types?)"      & thick &&     y ::= & x                                      \
-    & "(Base types)"  &       &&     A ::= & unit
-                                             | A_1 tsum ... tsum A_n
-                                             | A_1 tprod ... tprod A_n
-                                             | mu X . A
-                                             | X                                    \
-    & "(Values)"      &       &&     v ::= & x
-                                             | (v_1, ..., v_n)
-                                             | c thick v                            \
-    & "(Patterns)"    &       &&     p ::= & x
-                                             | (p_1, ..., p_n)                      \
-    & "(Expressions)" &       &&     e ::= & v
-                                             | #`let` p_1 = omega thick p_2 #`in` e \
-    & "(Isos)"        &       && omega ::= & { v_1 <-> e_1 | ... | v_n <-> e_n }
-                                             | #`fix` phi . omega
-                                             | lambda psi . omega
-                                             | phi
-                                             | omega_1 thick omega_2                \
-    & "(Terms)"       &       &&     t ::= & x
-                                             | (t_1, ..., t_n)
-                                             | c thick t
-                                             | omega thick t
-                                             | #`let` p = t_1 #`in` t_2             \
-  $
-]
+#{
+  set raw(syntaxes: "bnf.sublime-syntax")
+
+  ```bnf
+           <program> ::= <type definitions> program = <term>
+
+  <type definitions> ::= <type definition> |
+                         <type definition> <type definitions>
+
+   <type definition> ::= (type <type variable> = <constr> | ... | <constr>)
+
+            <constr> ::= <constr variable> | <constr variable> of <type>
+
+              <type> ::= unit | bool | i64 | <type> * ... * <type> |
+                         <type variable>
+
+           <literal> ::= () | false | true | -9223372036854775808 | ... |
+                         9223372036854775807
+
+             <value> ::= <literal> | <variable> | (<value>, ..., <value>)
+
+           <pattern> ::= <variable> | (<pattern>, ..., <pattern>)
+
+              <expr> ::= <value> | let <pattern> = <iso> <pattern> in <expr>
+
+               <iso> ::= add | sub | negate |
+                         (iso <value> <-> <expr> | ... | <value> <-> <expr>) |
+                         fun <iso variable> -> <iso> | <iso variable> |
+                         <iso> <iso>
+
+              <term> ::= <literal> | <variable> | (<term>, ..., <term>) |
+                         <iso> <term> | let <pattern> = <term> in <term>
+  ```
+}
 
 \
 
 *Typing Rules - Terms*
 
-#align(center)[
-  #set par(leading: 1em)
-  #show math.equation: set par(leading: 0.25em)
-
+#rules[
   #btree(rule($Psi; emptyset tack (): unit$))
   #h(1em)
   #btree(rule($Psi; x: A tack x: A$))
@@ -73,4 +84,8 @@
 
 *Typing Rules - Isos*
 
-
+#rules[
+  #btree(rule($Psi; phi: T tack (): unit$))
+  #h(1em)
+  #btree(rule($Psi; x: A tack x: A$))
+]
