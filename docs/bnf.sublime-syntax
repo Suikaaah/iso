@@ -1,0 +1,16 @@
+%YAML 1.2
+---
+file_extensions: [bnf]
+scope: source.bnf
+
+contexts:
+  main:
+    - match: '<->'
+      scope: text
+    - match: '<'
+      push: string
+
+  string:
+    - meta_scope: keyword
+    - match: '>'
+      pop: true
