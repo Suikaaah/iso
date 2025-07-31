@@ -11,5 +11,5 @@ program : nat_list * nat =
   | fr (h, t) <->
       let (t', n) : nat_list * nat = len (t : nat_list) in
       (fr (h, t'), fr n)
-  end) (fr (0, fr (0, fr (0, nil))) : nat_list)
+  end)
 
