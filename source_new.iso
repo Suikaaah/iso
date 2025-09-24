@@ -1,0 +1,14 @@
+type nat      = Zero | Succ of nat
+type nat_list = Nil | Cons of nat * nat_list
+
+program =
+  let 0 = Zero      in
+  let 1 = Succ zero in
+  let 2 = Succ one  in
+  let l = Cons (0, Cons (1, Cons (2, Nil))) in
+
+  (fix len. iso
+  | Nil         <-> (Nil, 0)
+  | Cons (h, t) <-> let (t', n) = len t in (Cons (h, t'), Succ n)
+  end) l
+

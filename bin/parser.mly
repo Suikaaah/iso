@@ -3,22 +3,15 @@ open Types
 %}
 
 %token EOF
-%token UNIT
 %token LPAREN
 %token RPAREN
 %token PIPE
 %token BACKSLASH
 %token DOT
 %token COMMA
-%token RIGHTARROW
 %token BIARROW
-%token PLUS
-%token TIMES
-%token COLON
 %token EQUAL
-%token INJL
-%token INJR
-%token FOLD
+%token UNIT
 %token LET
 %token IN
 %token ISO
@@ -27,15 +20,8 @@ open Types
 %token TYPE
 %token INVERT
 %token PROGRAM
-%token FOLDINJL
-%token FOLDINJR
-%token MU
+%token OF
 %token <string> ID
-
-%right RIGHTARROW
-%right BIARROW
-%right PLUS
-%right TIMES
 
 %start <program> program
 %type <(string * base_type) list> ts

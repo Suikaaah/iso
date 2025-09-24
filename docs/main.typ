@@ -11,10 +11,9 @@
 #let of = $mono("of")$
 #let mylet = $mono("let")$
 #let myin = $mono("in")$
-#let ctor = $c_"dec"$
-#let carm = $c_"arm"$
 #let tsum = $plus.circle$
 #let tprod = $times.circle$
+#let lalign(body) = align(box(body), left)
 #let btree(body) = box(prooftree(body))
 #let tack_sub(sub) = $thick #box($tack$) _sub thick$
 #let rules(body) = align(center)[
@@ -23,27 +22,45 @@
   #body
 ]
 
-*Grammar*
+*Grammar - Types*
 
-$
-  & "(Constructor arm)"         && wide & carm ::= & c | c of A                           \
-  & "(Constructor declaration)" &&      & ctor ::= & (type X = carm | ... | carm)         \
-  & "(Base types)"              &&      & A, B ::= & unit
-                                                     | A_1 tsum ... tsum A_n
-                                                     | A_1 tprod ... tprod A_n
-                                                     | mu X . A
-                                                     | X                                  \
-  & "(Isos)"                    &&      &    T ::= & A <-> B
-                                                     | T_1 -> T_2                         \
-  & "(Values)"                  &&      &    v ::= & ()
-                                                     | x
-                                                     | c thick v
-                                                     | (v_1, ..., v_n)                    \
-  & "(Patterns)"                &&      &    p ::= & x
-                                                     | (p_1, ..., p_n)                    \
-  & "(Expressions)"             &&      &    e ::= & v
-                                                     | mylet p_1 = omega thick p_2 myin e \
-$
+#lalign[
+  $
+    & "(Base types)" && wide & A, B ::= & unit
+                                          | A_1 tsum ... tsum A_n
+                                          | A_1 tprod ... tprod A_n
+                                          | mu X . A
+                                          | X \
+    & "(Isos)"       &&      &    T ::= & A <-> B
+                                          | T_1 -> T_2 \
+  $
+]
+
+\
+
+*Grammar - Terms*
+
+#lalign[
+  $
+    & "(Values)"      && wide &     v ::= & ()
+                                            | x
+                                            | c thick v
+                                            | (v_1, ..., v_n) \
+    & "(Patterns)"    &&      &     p ::= & x
+                                            | (p_1, ..., p_n) \
+    & "(Expressions)" &&      &     e ::= & v
+                                            | mylet p_1 = omega thick p_2 myin e \
+    & "(Isos)"        &&      & omega ::= & { v_1 <-> e_1 | ... | v_n <-> e_n }
+                                            | lambda phi . omega
+                                            | phi
+                                            | omega_1 thick omega_2 \
+    & "(Terms)"       &&      &     t ::= & ()
+                                            | x
+                                            | (t_1, ..., t_n)
+                                            | omega thick t
+                                            | mylet p = t_1 myin t_2
+  $
+]
 
 \
 
@@ -66,7 +83,7 @@ $
     $Psi; Delta tack t: A$,
   ))
   #btree(rule(
-    $Psi; Delta_1, Delta_2 tack #`let` (x_1, .., x_n) = t_1 #`in` t_2: B$,
+    $Psi; Delta_1, Delta_2 tack mylet (x_1, .., x_n) = t_1 myin t_2: B$,
     $Psi; Delta_1 tack t_1: A_1 tprod ... tprod A_n$,
     $Psi; Delta_2 tack x_1: A_1, ..., x_n: A_n tack t_2: B$,
   ))
@@ -77,7 +94,21 @@ $
 *Typing Rules - Isos*
 
 #rules[
-  #btree(rule($Psi; phi: T tack (): unit$))
+  #btree(rule($Psi; phi: T #tack_sub($omega$) phi: T$))
   #h(1em)
-  #btree(rule($Psi; x: A tack x: A$))
+  #btree(rule(
+    $Psi #tack_sub($omega$) omega_2 thick omega_1: T_2$,
+    $Psi #tack_sub($omega$) omega_1: T_1$,
+    $Psi #tack_sub($omega$) omega_2: T_1 -> T_2$,
+  ))
+  #h(1em)
+  #btree(rule(
+    $Psi #tack_sub($omega$) lambda phi . omega: T_1 -> T_2$,
+    $Psi, phi: T_1 #tack_sub($omega$) omega: T_2$,
+  ))
+  #btree(rule(
+    $Psi #tack_sub($omega$) { v_1 <-> e_1 | ... | v_n <-> e_n }: A <-> B$,
+    $Psi; Delta_1 tack v_1: A quad ... quad Psi; Delta_n tack v_n: A quad forall i eq.not j, v_i perp v_j$,
+    $Psi; Delta_1 tack e_1: B quad ... quad Psi; Delta_n tack e_n: B quad forall i eq.not j, e_i perp e_j$,
+  ))
 ]

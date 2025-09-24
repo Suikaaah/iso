@@ -4,27 +4,20 @@ open Parser
 }
 
 let white = [' ' '\t' '\r' '\n']+
-let string = [^ '1' '(' ')' '|' '\\' '.' ',' '-' '<' '>' '+' '*' ':' '=' ' ' '\t' '\r' '\n']+
+let string = [^ '(' ')' '|' '\\' '.' ',' '-' '<' '>' '=' ' ' '\t' '\r' '\n']+
 
 rule token = parse
   | eof { EOF }
   | white { token lexbuf }
-  | "1" { UNIT }
   | "(" { LPAREN }
   | ")" { RPAREN }
   | "|" { PIPE }
   | "\\" { BACKSLASH }
   | "." { DOT }
   | "," { COMMA }
-  | "->" { RIGHTARROW }
   | "<->" { BIARROW }
-  | "+" { PLUS }
-  | "*" { TIMES }
-  | ":" { COLON }
   | "=" { EQUAL }
-  | "injl" { INJL }
-  | "injr" { INJR }
-  | "fold" { FOLD }
+  | "unit" { UNIT }
   | "let" { LET }
   | "in" { IN }
   | "iso" { ISO }
@@ -33,8 +26,6 @@ rule token = parse
   | "type" { TYPE }
   | "invert" { INVERT }
   | "program" { PROGRAM }
-  | "fl" { FOLDINJL }
-  | "fr" { FOLDINJR }
-  | "mu" { MU }
+  | "of" { OF }
   | string { ID (lexeme lexbuf) }
 

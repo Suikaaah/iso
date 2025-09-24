@@ -50,7 +50,7 @@ and validate_iso psi iso (expected : iso_type) =
         validate_term context (term_of_value v) a
         && validate_term context (term_of_expr e) b
       in
-      let rec validate_ortho = function
+      (* let rec validate_ortho = function
         | [] -> true
         | (v, e) :: tl ->
             let t_v = term_of_value v in
@@ -60,8 +60,8 @@ and validate_iso psi iso (expected : iso_type) =
               && are_orthogonal t_e (term_of_value @@ extract_value e')
             in
             validate_ortho tl && List.for_all ortho_each tl
-      in
-      List.for_all validate_pair p && validate_ortho p
+      in *)
+      List.for_all validate_pair p (* && validate_ortho p *)
   | Invert omega, Pair (a, b) -> validate_iso psi omega (Pair (b, a))
   | Invert omega, Arrow (t_1, t_2) -> validate_iso psi omega (Arrow (t_2, t_1))
   | _ -> false
@@ -114,8 +114,7 @@ let read_program path =
   (List.fold_left folder_term t ts, List.fold_left folder_base_type a ts)
 
 let () =
-  let t, a = read_program "./source.iso" in
-  (* printf "input:\n%a\n\n" pp_term t; *)
+  let t, a = read_program "source.iso" in
   let well_typed = validate_term empty_context t a in
   if well_typed then printf "output:\n%a\n" pp_term (eval_term t)
   else println "error: ill-typed"

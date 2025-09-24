@@ -2,14 +2,13 @@ type nat      = mu x. 1 + x
 type nat_list = mu x. 1 + nat * x
 
 program : nat_list * nat =
-  let 0   : nat      = fl ()                       in
-  let nil : nat_list = fl ()                       in
-  let l   : nat_list = fr (0, fr (0, fr (0, nil))) in
+  let zero : nat      = fl () in
+  let nil  : nat_list = fl () in
 
   (fix len. iso
   | fl ()     <-> (fl (), fl ())
   | fr (h, t) <->
       let (t', n) : nat_list * nat = len (t : nat_list) in
       (fr (h, t'), fr n)
-  end)
+  end) (fr (zero, fr(zero, fr (zero, nil))) : nat_list)
 
