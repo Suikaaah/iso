@@ -9,6 +9,7 @@
 #let i64 = $mono("i64")$
 #let type = $mono("type")$
 #let of = $mono("of")$
+#let fix = $mono("fix")$
 #let mylet = $mono("let")$
 #let myin = $mono("in")$
 #let tsum = $plus.circle$
@@ -51,6 +52,7 @@
     & "(Expressions)" &&      &     e ::= & v
                                             | mylet p_1 = omega thick p_2 myin e \
     & "(Isos)"        &&      & omega ::= & { v_1 <-> e_1 | ... | v_n <-> e_n }
+                                            | fix phi . omega
                                             | lambda phi . omega
                                             | phi
                                             | omega_1 thick omega_2 \

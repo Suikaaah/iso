@@ -1,5 +1,5 @@
 %{
-open Types
+open TypesTop
 %}
 
 %token EOF
@@ -24,9 +24,9 @@ open Types
 %token <string> ID
 
 %start <program> program
-%type <(string * base_type) list> ts
-%type <base_type> base_type
-%type <iso_type> iso_type
+%type <(string * (string * base_type) list) list> ts
+%type <(string * base_type) list> arms
+%type <string * base_type> arm
 %type <value> value
 %type <pattern> pattern
 %type <expr> expr
@@ -36,34 +36,25 @@ open Types
 %%
 
 program:
-  | ts = ts; COLON; a = base_type; EQUAL; t = term; EOF; { { ts; t; a } }
+  | ts = ts; EQUAL; t = term; EOF; { { ts; t } }
 
 ts:
-  | TYPE; x = ID; EQUAL; a = base_type; rest = ts; { (x, a) :: rest }
+  | TYPE; x = ID; EQUAL; arms = arms; rest = ts; { (x, arms) :: rest }
   | PROGRAM; { [] }
 
-base_type:
-  | UNIT; { Unit }
-  | a = base_type; PLUS; b = base_type; { Sum (a, b) }
-  | a = base_type; TIMES; b = base_type; { Product (a, b) }
-  | MU; x = ID; DOT; a = base_type; { Inductive { x; a } }
-  | x = ID; { Variable x }
-  | LPAREN; a = base_type; RPAREN; { a }
+arms:
+  | arm = arm; PIPE; rest = arms; { arm :: rest }
+  | arm = arm; { [arm] }
 
-iso_type:
-  | a = base_type; BIARROW; b = base_type; { Pair (a, b) }
-  | t_1 = iso_type; RIGHTARROW; t_2 = iso_type; { Arrow (t_1, t_2) }
-  | LPAREN; t = iso_type; RPAREN; { t }
+arm:
+  | c = ID; OF; a = base_type; { (c, a) }
+  | c = ID; { (c, Unit) }
 
 value:
   | LPAREN; RPAREN; { Unit }
+  | c = ID; v = value; { Constructed { c; v } }
   | x = ID; { Variable x }
-  | INJL; v = value; { InjLeft v }
-  | INJR; v = value; { InjRight v }
   | LPAREN; v_1 = value; COMMA; v_2 = value; RPAREN; { Pair (v_1, v_2) }
-  | FOLD; v = value; { Fold v }
-  | FOLDINJL; v = value; { Fold (InjLeft v) }
-  | FOLDINJR; v = value; { Fold (InjRight v) }
 
 pattern:
   | x = ID; { Variable x }
